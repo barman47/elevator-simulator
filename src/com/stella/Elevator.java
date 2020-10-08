@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Elevator implements Runnable {
     private int numberOfFloors;
-    private int floor;
+    private int elevatorFloor;
     private final Door door;
     private Vector<User> calls;
     private Vector<Integer> destinations;
@@ -20,9 +20,9 @@ public class Elevator implements Runnable {
         this.door = new Door();
     }
 
-    public Elevator(int numberOfFloors, int floor, Vector<User> calls, Vector<Integer> destinations) {
+    public Elevator(int numberOfFloors, int elevatorFloor, Vector<User> calls, Vector<Integer> destinations) {
         this.numberOfFloors = numberOfFloors;
-        this.floor = floor;
+        this.elevatorFloor = elevatorFloor;
         this.door = new Door();
         this.calls = calls;
         this.destinations = destinations;
@@ -36,12 +36,12 @@ public class Elevator implements Runnable {
         NONE
     }
 
-    public int getFloor() {
-        return floor;
+    public int getElevatorFloor() {
+        return elevatorFloor;
     }
 
-    public void setFloor(int floor) {
-        this.floor = floor;
+    public void setElevatorFloor(int elevatorFloor) {
+        this.elevatorFloor = elevatorFloor;
     }
 
     public Door getDoor() {
@@ -89,24 +89,25 @@ public class Elevator implements Runnable {
     }
 
     public void callElevator (User user) throws InterruptedException {
+        int userIndex = this.calls.indexOf(user);
+        System.out.println("User called Elevator");
         if (this.isBusy) {
             return;
 //            System.out.println(Thread.currentThread() + " Waiting");
 //            this.wait();
         }
         this.setBusy(true);
-        int userIndex = this.calls.indexOf(user);
-        System.out.printf("User %d called Elevator\n", userIndex);
         if (this.direction == Direction.NONE || !calls.isEmpty()) {
-            // Set elevator to move to the floor where user called from
-            setDirection(chooseDirection(this.floor, user.getFloor()));
+            // Set elevator to move to the elevatorFloor where user called from
+            setDirection(chooseDirection(this.elevatorFloor, user.getFloor()));
             // Open elevator door if necessary (if door is not open)
             if (!this.door.isOpen()) {
                 this.door.open();
             }
 
-            System.out.printf("Elevator At Floor %d.", user.getFloor());
+            System.out.printf("Elevator At Floor %d.\n", user.getFloor());
             user.enterElevator();
+            System.out.printf("User entered destination: Floor %d.\n", user.getFloor());
 
             int userDestination = user.getDestination();
             Vector<Integer> destinations = new Vector<>(this.getDestinations());
@@ -118,7 +119,8 @@ public class Elevator implements Runnable {
             // Wait 2 seconds for elevator door to close
             TimeUnit.SECONDS.sleep(2);
 
-            chooseDirection(this.floor, user.getFloor());
+            chooseDirection(this.elevatorFloor, user.getFloor());
+            System.out.printf("Elevator at destination: Floor %d.\n", user.getDestination());
             user.exitElevator();
             this.door.close();
             System.out.println("Elevator Door Closed");
@@ -128,7 +130,7 @@ public class Elevator implements Runnable {
             removeDestination(user);
         } else if (!this.door.isOpen() || this.direction != user.getDirection()) {
             if (this.calls.isEmpty()) {
-                setDirection(chooseDirection(floor, user.getFloor()));
+                setDirection(chooseDirection(elevatorFloor, user.getFloor()));
                 this.door.open();
                 if (user.isDistracted()) {
                     // then don't enter elevator
@@ -144,14 +146,14 @@ public class Elevator implements Runnable {
 
     private Direction chooseDirection (int currentFloor, int userFloor) {
         if (currentFloor < userFloor) {
-            // Move elevator upwards to user floor or call floor
+            // Move elevator upwards to user elevatorFloor or call elevatorFloor
             System.out.println("Elevator Moving " + Direction.UPSTAIRS);
-            this.setFloor(userFloor);
+            this.setElevatorFloor(userFloor);
             return goUp(Direction.UPSTAIRS);
         } else if (currentFloor > userFloor) {
-            // Move elevator downwards to user floor or call floor
+            // Move elevator downwards to user elevatorFloor or call elevatorFloor
             System.out.println("Elevator Moving " + Direction.DOWN);
-            this.setFloor(userFloor);
+            this.setElevatorFloor(userFloor);
             return goDown(Direction.DOWN);
         } else {
             return Direction.NONE;
@@ -162,15 +164,15 @@ public class Elevator implements Runnable {
         // Sorted Vector of destinations
         Vector<Integer> sortedDestinations = sortDestinations(this.destinations);
 
-        // check if current floor = highest destination or floor
-        if (this.floor == sortedDestinations.elementAt(sortedDestinations.size() - 1)) {
+        // check if current elevatorFloor = highest destination or elevatorFloor
+        if (this.elevatorFloor == sortedDestinations.elementAt(sortedDestinations.size() - 1)) {
             // reverse the direction
-            this.setFloor(this.getFloor() - 1);
+            this.setElevatorFloor(this.getElevatorFloor() - 1);
             setDirection(Direction.DOWN);
             return Direction.DOWN;
         } else {
             // do not reverse the direction, go up.
-            this.setFloor(this.getFloor() + 1);
+            this.setElevatorFloor(this.getElevatorFloor() + 1);
             this.setDirection(direction);
             return direction;
         }
@@ -179,31 +181,34 @@ public class Elevator implements Runnable {
     private Direction goDown (Direction direction) {
         // Sorted Vector of destinations
         Vector<Integer> sortedDestinations = sortDestinations(this.destinations);
-        if (this.floor == sortedDestinations.get(0)) {
-            // reverse direction if at the lowest floor
-            setFloor(getFloor() + 1);
+        if (this.elevatorFloor == sortedDestinations.get(0)) {
+            // reverse direction if at the lowest elevatorFloor
+            setElevatorFloor(getElevatorFloor() + 1);
             setDirection(Direction.UPSTAIRS);
             return Direction.UPSTAIRS;
         } else {
             // Go down
-            this.setFloor(this.getFloor() - 1);
+            this.setElevatorFloor(this.getElevatorFloor() - 1);
             this.setDirection(direction);
             return direction;
         }
     }
 
-    private void removeDestination (User user) {
+    private void removeDestination (User user) throws InterruptedException {
+        this.setBusy(false);
         int userDestination = user.getDestination();
         int indexToRemove = this.destinations.indexOf(userDestination);
         this.destinations.remove(indexToRemove);
         if (!destinations.isEmpty()) {
-            System.out.println("There is " + destinations.size() + " users left in the elevator");
             int nextDestination = destinations.get(0);
-            if (nextDestination > this.floor) {
+            if (nextDestination > this.elevatorFloor) {
                 goDown(Direction.DOWN);
             } else {
                 goUp(Direction.UPSTAIRS);
             }
+        }
+        if (!this.calls.isEmpty()) {
+            this.callElevator(this.calls.get(0));
         }
     }
 
@@ -225,8 +230,4 @@ public class Elevator implements Runnable {
             e.printStackTrace();
         }
     }
-
-//    public void start () {
-//        run();
-//    }
 }
